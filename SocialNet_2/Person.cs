@@ -28,14 +28,14 @@ namespace SocialNet
 
     public class Person
     {
-        public string First { get; protected set; }
-        public string Last { get; protected set; }
-        public eGender PersonGender { get; protected set; }
-        public DateTime DateOfBirth { get; protected set; }
+        public string First { get; set; }
+        public string Last { get; set; }
+        public eGender PersonGender { get; set; }
+        public DateTime DateOfBirth { get; set; }
 
-        public eRelationshipStatus RelationshipStatus { get; protected set; }
-        public string School { get; protected set; }
-        public string University { get; protected set; }
+        public eRelationshipStatus RelationshipStatus { get; set; }
+        public string School { get; set; }
+        public string University { get; set; }
 
         public Person() { }
         public Person(eGender PersonGender, string First, string Last, DateTime DateOfBirth,
@@ -49,7 +49,7 @@ namespace SocialNet
             this.School = School;
             this.University = University;
         }
-
+        
         static List<string> MaleFirstNames = new List<string>(0);
         static List<string> MaleLastNames = new List<string>(0);
         static List<string> FemaleFirstNames = new List<string>(0);
@@ -90,7 +90,7 @@ namespace SocialNet
             }
 
             this.PersonGender = PersonGender;
-            DateOfBirth = Generate.NewDateTime(new DateTime(1970, 1, 1), DateTime.UtcNow);
+            DateOfBirth = Generate.NewDateTime(new DateTime(1970, 1, 1), new DateTime(DateTime.UtcNow.Subtract(new DateTime(15,1,1)).Ticks));
             RelationshipStatus = (eRelationshipStatus)Generate.Int(4);
 
             switch (Generate.Int(3))

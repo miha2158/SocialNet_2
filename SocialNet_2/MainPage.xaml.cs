@@ -1,16 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
+using System.Threading.Tasks;
 using Windows.ApplicationModel;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.Storage.Pickers.Provider;
+using Windows.System;
 using Windows.UI.Popups;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -23,7 +26,7 @@ using Windows.UI.Xaml.Navigation;
 
 namespace SocialNet
 {
-    internal enum DisplayMode
+    public enum DisplayMode
     {
         ActiveUserFeed,
         ActiveUserPosts,
@@ -48,24 +51,26 @@ namespace SocialNet
             var UsersAdded = 6;
 
             for (var i = 0; i < UsersAdded; i++)
-                AllUsers.Add(new User(await Person.MakeNew()));
-
+                AllUsers.Add(await User.MakeNew());
+            
             AllUsers[1].Subscribe(AllUsers[5]);
             AllUsers[0].Subscribe(AllUsers[1]);
-            AllUsers[2].Subscribe(AllUsers[4]);
-            AllUsers[4].Subscribe(AllUsers[5]);
             AllUsers[1].Subscribe(AllUsers[2]);
-            AllUsers[0].Subscribe(AllUsers[3]);
-            AllUsers[0].Subscribe(AllUsers[5]);
             AllUsers[2].Subscribe(AllUsers[3]);
+            AllUsers[4].Subscribe(AllUsers[5]);
+            AllUsers[0].Subscribe(AllUsers[3]);
+            AllUsers[2].Subscribe(AllUsers[4]);
+            AllUsers[0].Subscribe(AllUsers[5]);
 
+            displayMode = DisplayMode.ActiveUserInfo;
+            ActiveUser = AllUsers[0];
+            DisplayUser = ActiveUser;
 
-
-            
             ChooseUser.SelectedIndex = 0;
+            
+            //TODO: add a testing thingy??
 
 
-            //TODO: add a testing thingy
             UpdateCollections();
         }
 
@@ -76,25 +81,105 @@ namespace SocialNet
         public ObservableCollection<User> ActiveUserSubscriptions;
 
         public ObservableCollection<NewsItem> AllPosts;
-        private DisplayMode displayMode = DisplayMode.ActiveUserInfo;
+        public DisplayMode displayMode;
 
         public NewsItem NewNewsItem = new NewsItem();
 
-        private void UpdateCollections()
+        public void ReadInfo()
         {
-            ActiveUserSubscriptions = new ObservableCollection<User>(DisplayUser.Subscriptions);
+            UserInfo_First_Edit.Visibility = Visibility.Collapsed;
+            UserInfo_First.Visibility = Visibility.Visible;
+            UserInfo_First.Text = DisplayUser.First;
+
+            UserInfo_Last_Edit.Visibility = Visibility.Collapsed;
+            UserInfo_Last.Visibility = Visibility.Visible;
+            UserInfo_Last.Text = DisplayUser.Last;
+
+            UserInfo_RelationshipStatus.IsEnabled = ActiveUser == DisplayUser;
+            UserInfo_RelationshipStatus.SelectedIndex = (int)DisplayUser.RelationshipStatus;
+
+            UserInfo_DateOfBirth.IsEnabled = ActiveUser == DisplayUser;
+            UserInfo_DateOfBirth.Date = DisplayUser.DateOfBirth;
+
+            UserInfo_School_Edit.Visibility = Visibility.Collapsed;
+            UserInfo_School.Visibility = Visibility.Visible;
+            UserInfo_School.Text = DisplayUser.School;
+
+            UserInfo_University_Edit.Visibility = Visibility.Collapsed;
+            UserInfo_University.Visibility = Visibility.Visible;
+            UserInfo_University.Text = DisplayUser.University;
+
+            UserInfo_Gender.IsEnabled = ActiveUser == DisplayUser;
+            UserInfo_Gender.SelectedIndex = (int)DisplayUser.PersonGender;
+        }
+
+        public void UpdateFriends()
+        {
+            ActiveUserSubscriptions = new ObservableCollection<User>(ActiveUser.Subscriptions);
             FriendsList.ItemsSource = ActiveUserSubscriptions;
             FriendsList.UpdateLayout();
+        }
 
-            if (displayMode == DisplayMode.ActiveUserPosts || displayMode == DisplayMode.ActiveUserFeed)
-                AllPosts = new ObservableCollection<NewsItem>(displayMode == DisplayMode.ActiveUserPosts
-                                                                  ? DisplayUser.News.UserPosts
-                                                                  : DisplayUser.News.Feed);
+        public void UpdateCollections()
+        {
+            switch (displayMode)
+            {
+                case DisplayMode.ActiveUserFeed:
+                {
+                    NewsView.Visibility = Visibility.Visible;
+                    UserInfo.Visibility = Visibility.Collapsed;
+
+                    NewsFeedLabel.Content = "News Feed";
+                    AllPosts = new ObservableCollection<NewsItem>(ActiveUser.News.Feed);
+                }
+                break;
+
+                case DisplayMode.ActiveUserPosts:
+                {
+                    NewsView.Visibility = Visibility.Visible;
+                    UserInfo.Visibility = Visibility.Collapsed;
+
+                    NewsFeedLabel.Content = "Your Posts";
+                    AllPosts = new ObservableCollection<NewsItem>(ActiveUser.News.UserPosts);
+                }
+                break;
+
+                case DisplayMode.ActiveUserInfo:
+                {
+                    ReadInfo();
+                    NewsView.Visibility = Visibility.Collapsed;
+                    UserInfo.Visibility = Visibility.Visible;
+
+                    NewsFeedLabel.Content = "Your Info";
+
+                }
+                break;
+
+                case DisplayMode.SubscriptionPosts:
+                {
+                    NewsView.Visibility = Visibility.Visible;
+                    UserInfo.Visibility = Visibility.Collapsed;
+
+                    NewsFeedLabel.Content = DisplayUser.FullName + "'s Posts";
+                    AllPosts = new ObservableCollection<NewsItem>(DisplayUser.News.UserPosts);
+                }
+                break;
+
+                case DisplayMode.UserInfo:
+                {
+                    ReadInfo();
+                    NewsView.Visibility = Visibility.Collapsed;
+                    UserInfo.Visibility = Visibility.Visible;
+
+                    NewsFeedLabel.Content = DisplayUser.FullName + "'s Info";
+                }
+                    break;
+            }
+
+            UserName.Text = ActiveUser.FullName;
 
             NewsFeed.ItemsSource = AllPosts;
             NewsFeed.UpdateLayout();
-            foreach (var element in UserInfo.Children)
-                element.UpdateLayout();
         }
         
         private void AddFriendButton_Click(object sender, RoutedEventArgs e)
@@ -107,10 +192,12 @@ namespace SocialNet
             do
             {
                 r = AllUsers[Generate.Int(AllUsers.Count)];
-            } while (ActiveUserSubscriptions.Contains(r) || DisplayUser == r);
+            } while (ActiveUserSubscriptions.Contains(r) || ActiveUser == r);
 
-            DisplayUser.Subscribe(r);
+            ActiveUser.Subscribe(r);
+
             UpdateCollections();
+            UpdateFriends();
         }
         private async void NewUser_Click(object sender, RoutedEventArgs e)
         {
@@ -120,23 +207,35 @@ namespace SocialNet
         }
         private void ChooseUser_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            ActiveUser = (User)e.AddedItems.Last();
+            ActiveUser = e.AddedItems[0] as User;
+            UserName.Text = ActiveUser.ToString();
+
+            displayMode = DisplayMode.ActiveUserInfo;
             DisplayUser = ActiveUser;
-            UserName.Content = ActiveUser.ToString();
 
             UpdateCollections();
+            UpdateFriends();
+            ReadInfo();
         }
 
         private void FriendItemName_OnTapped(object sender, TappedRoutedEventArgs e)
         {
+            switch (displayMode)
+            {
+                case DisplayMode.ActiveUserFeed:
+                case DisplayMode.ActiveUserPosts:
+                    displayMode = DisplayMode.UserInfo;
+                    break;
+                case DisplayMode.ActiveUserInfo:
+                    displayMode = DisplayMode.UserInfo;
+                    break;
+            }
             DisplayUser = ActiveUserSubscriptions[FriendsList.SelectedIndex];
-            AllPosts = new ObservableCollection<NewsItem>(DisplayUser.News.UserPosts);
-            NewsFeedLabel.Content = DisplayUser.FullName + "'s Posts";
-
-            NewsFeed.ItemsSource = AllPosts;
-            NewsFeed.UpdateLayout();
+            
+            UpdateCollections();
+            ReadInfo();
         }
-        private async void FriendItemName_OnPointerPressed(object sender, DoubleTappedRoutedEventArgs e)
+        private async void FriendItemName__Tapped(object sender, DoubleTappedRoutedEventArgs e)
         {
             DisplayUser = ActiveUser;
             var dialog = new MessageDialog($"Do you really wish to remove {ActiveUserSubscriptions[FriendsList.SelectedIndex]} from your friends?", "Are you sure");
@@ -146,47 +245,9 @@ namespace SocialNet
             if ((await dialog.ShowAsync()).Label == "No")
                 return;
             DisplayUser.UnSubscribe(ActiveUserSubscriptions[FriendsList.SelectedIndex]);
-            UpdateCollections();
-        }
-        private void UserName_OnTapped(object sender, TappedRoutedEventArgs e)
-        {
-            if (ActiveUser == DisplayUser)
-            {
-                if (displayMode == DisplayMode.ActiveUserInfo)
-                {
-                    displayMode = DisplayMode.ActiveUserFeed;
-                    NewsFeedLabel.Visibility = Visibility.Collapsed;
-                    NewPost.Visibility = Visibility.Collapsed;
-                    NewsFeed.Visibility = Visibility.Collapsed;
-                    UserInfo.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    displayMode = DisplayMode.ActiveUserInfo;
-                    NewsFeedLabel.Visibility = Visibility.Visible;
-                    NewPost.Visibility = Visibility.Visible;
-                    NewsFeed.Visibility = Visibility.Visible;
-                    UserInfo.Visibility = Visibility.Collapsed;
-                }
-            }
-            else if (displayMode == DisplayMode.UserInfo)
-            {
-                displayMode = DisplayMode.SubscriptionPosts;
-                NewsFeedLabel.Visibility = Visibility.Collapsed;
-                NewPost.Visibility = Visibility.Collapsed;
-                NewsFeed.Visibility = Visibility.Collapsed;
-                UserInfo.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                displayMode = DisplayMode.UserInfo;
-                NewsFeedLabel.Visibility = Visibility.Visible;
-                NewPost.Visibility = Visibility.Visible;
-                NewsFeed.Visibility = Visibility.Visible;
-                UserInfo.Visibility = Visibility.Collapsed;
-            }
 
             UpdateCollections();
+            UpdateFriends();
         }
         
         private void PostNewNewsItem_Click(object sender, RoutedEventArgs e)
@@ -246,25 +307,123 @@ namespace SocialNet
 
         private void ModeChange_OnTapped(object sender, TappedRoutedEventArgs e)
         {
-            DisplayUser = ActiveUser;
-            if (displayMode == DisplayMode.ActiveUserFeed)
-                displayMode = DisplayMode.ActiveUserPosts;
-            else displayMode = DisplayMode.ActiveUserFeed;
+            switch (displayMode)
+            {
+                case DisplayMode.ActiveUserFeed:
+                    displayMode = DisplayMode.ActiveUserPosts;
+                    break;
 
+                case DisplayMode.ActiveUserPosts:
+                    displayMode = DisplayMode.ActiveUserInfo;
+                    UserInfo_DateOfBirth.IsEnabled = true;
+                    UserInfo_RelationshipStatus.IsEnabled = true;
+                    break;
 
-            NewsFeedLabel.Content = displayMode == DisplayMode.ActiveUserPosts ? "Your Posts" : "News Feed";
+                case DisplayMode.ActiveUserInfo:
+                    displayMode = DisplayMode.ActiveUserFeed;
+                    break;
+
+                case DisplayMode.SubscriptionPosts:
+                    displayMode = DisplayMode.UserInfo;
+                    UserInfo_DateOfBirth.IsEnabled = false;
+                    UserInfo_RelationshipStatus.IsEnabled = false;
+                break;
+
+                case DisplayMode.UserInfo:
+                    displayMode = DisplayMode.SubscriptionPosts;
+                break;
+            }
+            
             UpdateCollections();
         }
 
-        private void RepeatBD()
+        private void ChangeField(TextBlock f1, TextBox f2)
         {
-            var prev = DateTime.UtcNow;
+            if(DisplayUser != ActiveUser)
+                return;
 
-            var t = new Timer(delegate
-                              {
+            f1.Visibility = Visibility.Collapsed;
+            f2.Text = f1.Text;
+            f2.Visibility = Visibility.Visible;
 
-                              }
-                             ,null,0,10000);
+            f2.Focus(FocusState.Pointer);
+            f2.SelectionStart = f2.Text.Length;
+            f2.SelectionLength = 0;
+        }
+        private void ChangeField(TextBlock f1, TextBox f2, KeyRoutedEventArgs e, bool override1 = false)
+        {
+            if (override1 || e?.Key == VirtualKey.Escape || e?.Key == VirtualKey.Enter)
+            {
+                f1.Text = f2.Text.Replace('\n', ' ').Replace('\t', ' ');
+
+                f1.Visibility = Visibility.Visible;
+                f2.Visibility = Visibility.Collapsed;
+
+                f2.Text = f1.Text;
+            }
+        }
+
+        private void UserInfo_First_OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            ChangeField(UserInfo_First, UserInfo_First_Edit);
+        }
+        private void UserInfo_Last_OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            ChangeField(UserInfo_Last, UserInfo_Last_Edit);
+        }
+        private void UserInfo_School_OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            ChangeField(UserInfo_School, UserInfo_School_Edit);
+        }
+        private void UserInfo_University_OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            ChangeField(UserInfo_University, UserInfo_University_Edit);
+        }
+
+        private void UserInfo_First_Edit_OnKeyUp(object sender, RoutedEventArgs e)
+        {
+            ChangeField(UserInfo_First, UserInfo_First_Edit, e as KeyRoutedEventArgs, !(e is KeyRoutedEventArgs));
+            DisplayUser.First = UserInfo_First.Text;
+        }
+        private void UserInfo_Last_Edit_OnKeyUp(object sender, RoutedEventArgs e)
+        {
+            ChangeField(UserInfo_Last, UserInfo_Last_Edit, e as KeyRoutedEventArgs, !(e is KeyRoutedEventArgs));
+            DisplayUser.Last = UserInfo_Last.Text;
+        }
+        private void UserInfo_School_Edit_OnKeyUp(object sender, RoutedEventArgs e)
+        {
+            ChangeField(UserInfo_School, UserInfo_School_Edit, e as KeyRoutedEventArgs, !(e is KeyRoutedEventArgs));
+            DisplayUser.School = UserInfo_School.Text;
+        }
+        private void UserInfo_University_Edit_OnKeyUp(object sender, RoutedEventArgs e)
+        {
+            ChangeField(UserInfo_University, UserInfo_University_Edit, e as KeyRoutedEventArgs, !(e is KeyRoutedEventArgs));
+            DisplayUser.University = UserInfo_University.Text;
+        }
+
+        private void UserInfo_RelationshipStatus_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ActiveUser == DisplayUser)
+                DisplayUser.RelationshipStatus = (eRelationshipStatus) UserInfo_RelationshipStatus.SelectedIndex;
+        }
+        private void UserInfo_Gender_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ActiveUser == DisplayUser)
+                DisplayUser.PersonGender = (eGender)UserInfo_Gender.SelectedIndex;
+        }
+        private void UserInfo_DateOfBirth_OnDateChanged(object sender, DatePickerValueChangedEventArgs e)
+        {
+            if (ActiveUser == DisplayUser)
+                DisplayUser.DateOfBirth = UserInfo_DateOfBirth.Date.UtcDateTime;
+        }
+
+        private void NewsFeedLabel_OnDoubleTapped(object sender, RoutedEventArgs e)
+        {
+            DisplayUser = ActiveUser;
+            displayMode = DisplayMode.ActiveUserInfo;
+
+            UpdateCollections();
+            ReadInfo();
         }
 
     }

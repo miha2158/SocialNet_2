@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Serialization;
 using Windows.Storage;
 using Windows.Graphics.Imaging;
@@ -16,6 +18,10 @@ namespace SocialNet
         public List<User> Subscriptions = new List<User>(0);
         
         public NewsFeed News = new NewsFeed();
+
+        public DateTime BirthdayNoYear => (new DateTime(DateOfBirth.Ticks, DateTimeKind.Utc)).AddYears(DateTime.Today.Year - DateOfBirth.Year);
+
+        private int WaitTime = 8;
 
         public User()
         {
@@ -51,20 +57,10 @@ namespace SocialNet
         {
             News.AddNewItem += AddNewPost;
             News.RemoveNewsItem += RemovePost;
-
-
+            RepeatBD();
         }
 
-        public void AddNewPost(object sender, NewsItem item)
-        {
-            News.Feed.Add(item);
-        }
-        public void RemovePost(object sender, NewsItem item)
-        {
-            News.Feed.Remove(item);
-        }
-
-        public void Subscribe(User Target)
+        public async void Subscribe(User Target)
         {
             if(Target == this || Subscriptions.Contains(Target))
                 return;
@@ -73,16 +69,18 @@ namespace SocialNet
             Target.Subscriptions.Add(this);
 
             AddPost(new NewsItem(this, $"{this} and {Target} are friends now"));
-            Target.AddPost(new NewsItem(Target, $"{Target} and {this} are friends now"));
+
+            Target.AddPost(new NewsItem(Target, $"{this} and {Target} are friends now"));
 
             News.AddNewItem += Target.AddNewPost;
-            Target.News.AddNewItem += AddNewPost;
-
             News.RemoveNewsItem += Target.RemovePost;
+
+            Target.News.AddNewItem += AddNewPost;
             Target.News.RemoveNewsItem += RemovePost;
 
+            await Task.Delay(WaitTime);
         }
-        public void UnSubscribe(User Target)
+        public async void UnSubscribe(User Target)
         {
             if(!Subscriptions.Contains(Target))
                 return;
@@ -94,8 +92,18 @@ namespace SocialNet
             Target.News.AddNewItem -= AddNewPost;
 
             AddPost(new NewsItem(this, $"{this} and {Target} are no longer friends"));
-            Target.AddPost(new NewsItem(Target, $"{Target} and {this} are no longer friends"));
+            Target.AddPost(new NewsItem(Target, $"{this} and {Target} are no longer friends"));
 
+            await Task.Delay(WaitTime);
+        }
+
+        public void AddNewPost(object sender, NewsItem item)
+        {
+            News.Feed.Add(item);
+        }
+        public void RemovePost(object sender, NewsItem item)
+        {
+            News.Feed.Remove(item);
         }
 
         public void AddPost(NewsItem Post)
@@ -107,6 +115,34 @@ namespace SocialNet
         {
             News.UserPosts.Remove(Post);
             News.InvokeRemove(this, Post);
+        }
+
+        DateTime prev = DateTime.UtcNow;
+
+        private async void RepeatBD()
+        {
+            var t = new Timer(
+                async delegate
+                {
+                    if (prev < BirthdayNoYear && false)
+                    {
+                        AddPost(new NewsItem(this, $"{this}'s Birthday is Tomorrow"));
+                        await Task.Delay(WaitTime);
+                        News.UserPosts.Remove(News.UserPosts.Last());
+                    }
+                },
+                null,
+                0,
+                10000);
+            prev = DateTime.UtcNow;
+        }
+
+        public new static async Task<User> MakeNew() => await MakeNew((eGender)Generate.Int(2));
+        public new static async Task<User> MakeNew(eGender PersonGender)
+        {
+            var p = new User();
+            p = await p.FillBlanks(PersonGender) as User;
+            return p;
         }
 
         public static void Serialize(User user)
