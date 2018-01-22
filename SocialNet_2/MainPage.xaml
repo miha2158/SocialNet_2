@@ -31,7 +31,7 @@
                 <TextBlock FontSize="32" Text="Friends" HorizontalAlignment="Center" VerticalAlignment="Center" PointerPressed="Breakpoint"/>
                 <Button Name="AddFriendButton" FontSize="20"  Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="Add Friend" Click="AddFriendButton_Click" />
             </Grid>
-            <ListView Name="FriendsList" VerticalAlignment="Top" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ActiveUserSubscriptions}" MaxHeight="700" MinHeight="200">
+            <ListView Name="FriendsList" VerticalAlignment="Top" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ActiveUser.Subscriptions}" MaxHeight="700" MinHeight="200">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Name="FriendItemName" FontSize="25" Text="{Binding FullName}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" TextAlignment="Center" Tapped="FriendItemName_OnTapped" DoubleTapped="FriendItemName__Tapped" />

@@ -49,10 +49,15 @@ namespace SocialNet
         private async void MainGrid_OnLoaded(object sender, RoutedEventArgs e)
         {
             var UsersAdded = 6;
+            bool done = false;
+
+            AllUsers = new ObservableCollection<User>();
 
             for (var i = 0; i < UsersAdded; i++)
                 AllUsers.Add(await User.MakeNew());
-            
+
+            AllUsers[1].DateOfBirth = new DateTime(1984, DateTime.Today.Month, DateTime.Today.Day, DateTime.UtcNow.Hour, DateTime.UtcNow.Minute, DateTime.UtcNow.Second).AddDays(1).AddSeconds(20);
+
             AllUsers[1].Subscribe(AllUsers[5]);
             AllUsers[0].Subscribe(AllUsers[1]);
             AllUsers[1].Subscribe(AllUsers[2]);
@@ -61,24 +66,22 @@ namespace SocialNet
             AllUsers[0].Subscribe(AllUsers[3]);
             AllUsers[2].Subscribe(AllUsers[4]);
             AllUsers[0].Subscribe(AllUsers[5]);
-
+            
             displayMode = DisplayMode.ActiveUserInfo;
             ActiveUser = AllUsers[0];
             DisplayUser = ActiveUser;
 
-            ChooseUser.SelectedIndex = 0;
-            
             //TODO: add a testing thingy??
 
-
             UpdateCollections();
+            UpdateFriends();
+            ReadInfo();
         }
 
-        public ObservableCollection<User> AllUsers = new ObservableCollection<User>();
+        public ObservableCollection<User> AllUsers;
 
         public User ActiveUser;
         public User DisplayUser;
-        public ObservableCollection<User> ActiveUserSubscriptions;
 
         public ObservableCollection<NewsItem> AllPosts;
         public DisplayMode displayMode;
@@ -112,14 +115,10 @@ namespace SocialNet
             UserInfo_Gender.IsEnabled = ActiveUser == DisplayUser;
             UserInfo_Gender.SelectedIndex = (int)DisplayUser.PersonGender;
         }
-
         public void UpdateFriends()
         {
-            ActiveUserSubscriptions = new ObservableCollection<User>(ActiveUser.Subscriptions);
-            FriendsList.ItemsSource = ActiveUserSubscriptions;
             FriendsList.UpdateLayout();
         }
-
         public void UpdateCollections()
         {
             switch (displayMode)
@@ -130,7 +129,7 @@ namespace SocialNet
                     UserInfo.Visibility = Visibility.Collapsed;
 
                     NewsFeedLabel.Content = "News Feed";
-                    AllPosts = new ObservableCollection<NewsItem>(ActiveUser.News.Feed);
+                    AllPosts = ActiveUser.News.Feed;
                 }
                 break;
 
@@ -140,7 +139,7 @@ namespace SocialNet
                     UserInfo.Visibility = Visibility.Collapsed;
 
                     NewsFeedLabel.Content = "Your Posts";
-                    AllPosts = new ObservableCollection<NewsItem>(ActiveUser.News.UserPosts);
+                    AllPosts = ActiveUser.News.UserPosts;
                 }
                 break;
 
@@ -161,7 +160,7 @@ namespace SocialNet
                     UserInfo.Visibility = Visibility.Collapsed;
 
                     NewsFeedLabel.Content = DisplayUser.FullName + "'s Posts";
-                    AllPosts = new ObservableCollection<NewsItem>(DisplayUser.News.UserPosts);
+                    AllPosts = DisplayUser.News.UserPosts;
                 }
                 break;
 
@@ -177,8 +176,7 @@ namespace SocialNet
             }
 
             UserName.Text = ActiveUser.FullName;
-
-            NewsFeed.ItemsSource = AllPosts;
+            
             NewsFeed.UpdateLayout();
         }
         
@@ -192,7 +190,7 @@ namespace SocialNet
             do
             {
                 r = AllUsers[Generate.Int(AllUsers.Count)];
-            } while (ActiveUserSubscriptions.Contains(r) || ActiveUser == r);
+            } while (ActiveUser.Subscriptions.Contains(r) || ActiveUser == r || ActiveUser.Subscriptions.Count == AllUsers.Count);
 
             ActiveUser.Subscribe(r);
 
@@ -201,16 +199,18 @@ namespace SocialNet
         }
         private async void NewUser_Click(object sender, RoutedEventArgs e)
         {
-            AllUsers.Add(new User(await Person.MakeNew()));
+            AllUsers.Add(await User.MakeNew());
 
-            ChooseUser.SelectedIndex = AllUsers.Count;
+            ChooseUser.SelectedIndex = AllUsers.Count - 1;
+
+            displayMode = DisplayMode.ActiveUserInfo;
+            UpdateCollections();
         }
         private void ChooseUser_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             ActiveUser = e.AddedItems[0] as User;
-            UserName.Text = ActiveUser.ToString();
 
-            displayMode = DisplayMode.ActiveUserInfo;
+            displayMode = DisplayMode.ActiveUserFeed;
             DisplayUser = ActiveUser;
 
             UpdateCollections();
@@ -230,7 +230,7 @@ namespace SocialNet
                     displayMode = DisplayMode.UserInfo;
                     break;
             }
-            DisplayUser = ActiveUserSubscriptions[FriendsList.SelectedIndex];
+            DisplayUser = ActiveUser.Subscriptions[FriendsList.SelectedIndex];
             
             UpdateCollections();
             ReadInfo();
@@ -238,13 +238,13 @@ namespace SocialNet
         private async void FriendItemName__Tapped(object sender, DoubleTappedRoutedEventArgs e)
         {
             DisplayUser = ActiveUser;
-            var dialog = new MessageDialog($"Do you really wish to remove {ActiveUserSubscriptions[FriendsList.SelectedIndex]} from your friends?", "Are you sure");
+            var dialog = new MessageDialog($"Do you really wish to remove {ActiveUser.Subscriptions[FriendsList.SelectedIndex]} from your friends?", "Are you sure");
             dialog.Commands.Add(new UICommand("Yes"));
             dialog.Commands.Add(new UICommand("No"));
 
             if ((await dialog.ShowAsync()).Label == "No")
                 return;
-            DisplayUser.UnSubscribe(ActiveUserSubscriptions[FriendsList.SelectedIndex]);
+            DisplayUser.UnSubscribe(ActiveUser.Subscriptions[FriendsList.SelectedIndex]);
 
             UpdateCollections();
             UpdateFriends();

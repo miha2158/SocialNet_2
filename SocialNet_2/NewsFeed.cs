@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace SocialNet
 {
     public class NewsFeed
     {
-        public SortedSet<NewsItem> UserPosts = new SortedSet<NewsItem>();
+        public ObservableCollection<NewsItem> UserPosts = new ObservableCollection<NewsItem>();
 
-        public SortedSet<NewsItem> Feed = new SortedSet<NewsItem>();
+        public ObservableCollection<NewsItem> Feed = new ObservableCollection<NewsItem>();
 
         public event EventHandler<NewsItem> AddNewItem;
         public event EventHandler<NewsItem> RemoveNewsItem;

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -15,26 +16,17 @@ namespace SocialNet
     {
         public string FullName => ToString();
 
-        public List<User> Subscriptions = new List<User>(0);
-        
+        private static int WaitTime = 1;
+
+        public ObservableCollection<User> Subscriptions = new ObservableCollection<User>();
         public NewsFeed News = new NewsFeed();
-
-        public DateTime BirthdayNoYear => (new DateTime(DateOfBirth.Ticks, DateTimeKind.Utc)).AddYears(DateTime.Today.Year - DateOfBirth.Year);
-
-        private int WaitTime = 8;
+        public BirthdayCrawler BDC;
 
         public User()
         {
             Activate();
         }
-
-        public User(BitmapImage Image, eGender PersonGender, string First, string Last, DateTime DateOfBitrh,
-            eRelationshipStatus RelationshipStatus, string School = null, string University = null):
-            this(PersonGender, First, Last, DateOfBitrh, RelationshipStatus, School, University)
-        {
-            Activate();
-            News.UserPosts.Add(new NewsItem(this, Image));
-        }
+        
         public User(eGender PersonGender, string First, string Last, DateTime DateOfBitrh,
             eRelationshipStatus RelationshipStatus, string School = null, string University = null):
             base(PersonGender, First, Last, DateOfBitrh, RelationshipStatus, School, University)
@@ -47,17 +39,12 @@ namespace SocialNet
         {
             Activate();
         }
-        public User(BitmapImage Image, Person Base): this(Image, Base.PersonGender, Base.First, Base.Last,
-            Base.DateOfBirth, Base.RelationshipStatus, Base.School, Base.University)
-        {
-            Activate();
-        }
 
         public void Activate()
         {
             News.AddNewItem += AddNewPost;
             News.RemoveNewsItem += RemovePost;
-            RepeatBD();
+            BDC = new BirthdayCrawler(this);
         }
 
         public async void Subscribe(User Target)
@@ -99,7 +86,7 @@ namespace SocialNet
 
         public void AddNewPost(object sender, NewsItem item)
         {
-            News.Feed.Add(item);
+            News.Feed.Insert(0,item);
         }
         public void RemovePost(object sender, NewsItem item)
         {
@@ -108,7 +95,7 @@ namespace SocialNet
 
         public void AddPost(NewsItem Post)
         {
-            News.UserPosts.Add(Post);
+            News.UserPosts.Insert(0,Post);
             News.InvokeAdd(this, Post);
         }
         public void RemovePost(NewsItem Post)
@@ -116,27 +103,7 @@ namespace SocialNet
             News.UserPosts.Remove(Post);
             News.InvokeRemove(this, Post);
         }
-
-        DateTime prev = DateTime.UtcNow;
-
-        private async void RepeatBD()
-        {
-            var t = new Timer(
-                async delegate
-                {
-                    if (prev < BirthdayNoYear && false)
-                    {
-                        AddPost(new NewsItem(this, $"{this}'s Birthday is Tomorrow"));
-                        await Task.Delay(WaitTime);
-                        News.UserPosts.Remove(News.UserPosts.Last());
-                    }
-                },
-                null,
-                0,
-                10000);
-            prev = DateTime.UtcNow;
-        }
-
+        
         public new static async Task<User> MakeNew() => await MakeNew((eGender)Generate.Int(2));
         public new static async Task<User> MakeNew(eGender PersonGender)
         {
